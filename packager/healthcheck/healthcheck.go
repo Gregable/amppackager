@@ -22,15 +22,16 @@ import (
 )
 
 type HealthCheck struct {
-	cert string `json:"cert"`
-	http string `json:"http"`
+	cert string
+	http string
+	rtv string
 }
 
 func New() (*HealthCheck, error) {
 	this := new(HealthCheck)
-	// For now, this is just a constant stub.
-	this.cert := "OK"
-	this.http := "OK"
+	this.cert = "OK"
+	this.http = "OK"
+	this.rtv = "OK"
 	return this, nil
 }
 
@@ -42,15 +43,32 @@ func (this *HealthCheck) IsHealthy() (bool) {
 	if this.http != "OK" {
 		return false;
 	}
+	if this.rtv != "OK" {
+		return false;
+	}
 	return true;
 }
 
+// Returns false if any HealthCheck field is not set to "OK".
+func (this *HealthCheck) ToJson() ([]byte, error) {
+	return json.MarshalIndent(map[string]string{
+		"cert": this.cert,
+		"http": this.http,
+		"rtv": this.rtv,
+	}, "", "\t")
+}
+
+
 func (this *HealthCheck) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	content, err = json.MarshalIndent(this, "", "\t")
+	content, err := this.ToJson();
 	if err != nil {
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Cache-Control", "no-store")
+	resp.Header().Set("X-Content-Type-Options", "nosniff")
 
 	if this.IsHealthy() {
 	  resp.WriteHeader(http.StatusOK)
@@ -58,8 +76,5 @@ func (this *HealthCheck) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 	  resp.WriteHeader(http.StatusInternalServerError)
 	}
 
-	resp.Header().Set("Content-Type", "text/plain")
-	resp.Header().Set("Cache-Control", "no-store")
-	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(resp, req, "", time.Time{}, bytes.NewReader(content))
 }
